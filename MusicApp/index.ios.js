@@ -1,96 +1,133 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- */
 'use strict';
 
 var React = require('react-native');
 var {
   AppRegistry,
+  Navigator,
   StyleSheet,
   Text,
+  TextInput,
+  TouchableHighlight,
   View,
 } = React;
-var Mopidy = require("mopidy");
+var SearchResults = require('./components/SearchResults');
+var styles = require('./styles');
+var Mopidy = require('./Mopidy');
+var NavigationBar = require('react-native-navbar');
 
-console.log('mopidy', Mopidy);
+const mopidy = new Mopidy();
 
-var mopidy = new Mopidy({
-  webSocketUrl: "ws://127.0.0.1:6680/mopidy/ws/"
+var navigation = React.createClass ({
+
+  renderScene(route, navigator) {
+    var Component = route.component;
+    var navBar = route.navigationBar;
+
+    if (navBar) {
+      navBar = Object.assign(navBar, {
+        navigator: navigator,
+        route: route
+      });
+    }
+
+    return (
+      <View style={styles.navContainer}>
+        {navBar}
+        <Component
+          navigator={navigator}
+          mopidy={mopidy}
+          {...route.props} />
+      </View>
+    );
+  },
+
+  render: function() {
+    var titleConfig = {
+      title: 'Music App',
+    };
+    return (
+      <Navigator
+        ref={(navigator) => {
+          this._navigator = navigator;
+        }}
+        renderScene={this.renderScene}
+        configureScene={(route) => ({
+          ...route.sceneConfig || Navigator.SceneConfigs.FloatFromRight
+        })}
+        style={styles.navContainer}
+        initialRoute={
+          {
+            component: MusicApp,
+            navigationBar: <NavigationBar title={titleConfig} />
+          }
+        }
+      />
+    );
+  },
 });
 
-mopidy.on(console.log.bind(console));
-
-var trackDesc = function (track) {
-    return track.name + " by " + track.artists[0].name +
-        " from " + track.album.name;
-};
-
-var queueAndPlay = function (playlistNum, trackNum) {
-    playlistNum = playlistNum || 0;
-    trackNum = trackNum || 0;
-
-    console.log(mopidy)
-
-    mopidy.getUriSchemes().then(function(schemes) {
-      console.log('schemes:', schemes);
-    });
-
-    mopidy.playlists.getPlaylists().then(function (playlists) {
-        var playlist = playlists[2];
-        console.log("Loading playlist:", playlists, playlist.name, playlist.tracks);
-        return mopidy.tracklist.add(playlist.tracks).then(function (tlTracks) {
-            return mopidy.playback.play(tlTracks[trackNum]).then(function () {
-                return mopidy.playback.getCurrentTrack().then(function (track) {
-                    console.log("Now playing:", trackDesc(track));
-                });
-            });
-            console.log('hi!', tlTracks)
-        });
-    })
-    .catch(console.error.bind(console)) // Handle errors here
-    .done();                            // ...or they'll be thrown here
-};
-
-
-mopidy.on("state:online", queueAndPlay);
-
 var MusicApp = React.createClass({
+
+  getInitialState: function() {
+      return {
+        text: ''
+      }
+  },
+
+  _search: function() {
+    mopidy.searchArtist(this.state.text).then((results) => {
+      if (results && results.length) {
+        var titleConfig = {
+          title: 'Search Results',
+        };
+        var leftButtonConfig = {
+          title: 'Back',
+          handler: () => this.props.navigator.pop()
+        };
+        this.props.navigator.push({
+          title: 'Search Results',
+          component: SearchResults,
+          navigationBar:
+            <NavigationBar
+              title={titleConfig}
+              leftButton={leftButtonConfig}
+            />,
+          props: {
+            data: results[0]
+          }
+        });
+        // mopidy.getAlbum(artist[0].albums[0].uri).then(function(album) {
+        //   if (album && album.length) {
+        //     console.log('yo', album)
+        //     // mopidy.add({tracks:album[0].tracks}).then(function(id) {
+        //     //   mopidy.play();
+        //     // });
+        //   }
+        // });
+      }
+    });
+    this.setState({
+      text: ''
+    });
+  },
+
   render: function() {
     return (
       <View style={styles.container}>
-        <Text style={styles.welcome}>
-          Welcome to React Native!
-        </Text>
-        <Text style={styles.instructions}>
-          To get started, edit index.ios.js
-        </Text>
-        <Text style={styles.instructions}>
-          Press Cmd+R to reload,{'\n'}
-          Cmd+D or shake for dev menu
-        </Text>
+        <TextInput
+          style={styles.textbox.normal}
+          onChangeText={(text) => this.setState({text})}
+          value={this.state.text}
+        />
+      <TouchableHighlight
+        onPress={this._search}
+        style={styles.button}
+        underlayColor='#99d9f4'>
+          <Text style={styles.buttonText}>Search</Text>
+        </TouchableHighlight>
       </View>
     );
   }
 });
 
-var styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5FCFF',
-  },
-  welcome: {
-    fontSize: 20,
-    textAlign: 'center',
-    margin: 10,
-  },
-  instructions: {
-    textAlign: 'center',
-    color: '#333333',
-    marginBottom: 5,
-  },
-});
-
-AppRegistry.registerComponent('MusicApp', () => MusicApp);
+AppRegistry.registerComponent('MusicApp', () => navigation);
