@@ -4,20 +4,19 @@ function M() {
 }
 
 M.prototype.init = function() {
-  var _this = this;
-  return new Promise(function(resolve, reject) {
+  return new Promise((resolve, reject) => {
     var Mopidy = require("mopidy");
 
-    _this.mopidy = new Mopidy({
+    this.mopidy = new Mopidy({
       webSocketUrl: "ws://localhost:6680/mopidy/ws/",
       callingConvention: "by-position-or-by-name"
     });
 
-    _this.mopidy.on(console.log.bind(console));
+    this.mopidy.on(console.log.bind(console));
 
-    _this.mopidy.on("state:online", function() {
-      _this.online = true;
-      resolve(_this.online);
+    this.mopidy.on("state:online", () => {
+      this.online = true;
+      resolve(this.online);
     });
   });
 }
@@ -41,11 +40,11 @@ M.prototype.getAlbum = function(uri) {
 }
 
 M.prototype.add = function(add) {
-  return this.mopidy.tracklist.add(add);
+  return this.mopidy.tracklist.add({uri: add});
 }
 
-M.prototype.play = function() {
-  return this.mopidy.playback.play({});
+M.prototype.play = function(item) {
+  return this.mopidy.playback.play({tlid: item.tlid});
 }
 
 M.prototype._search = function(query) {
